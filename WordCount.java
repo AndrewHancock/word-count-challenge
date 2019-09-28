@@ -42,18 +42,16 @@ public class WordCount{
     }
 
     private static Map<String, Integer> countWords(SplitReader tokenReader) throws IOException {
-        Map<String, Integer> counts = new HashMap<>(1024);
+        Map<ByteBuffer, Integer> counts = new HashMap<>(1024);
         byte[] token = null;
         while ((token = tokenReader.getToken()) != null) {
-            String tokenStr = new String(token, "UTF-8");
-            int value = counts.getOrDefault(tokenStr, 0);
-            counts.put(tokenStr, value + 1);
-            //counts.merge(new String(token, "UTF-8"), 1, Integer::sum);
-
+            ByteBuffer tokenBuf = ByteBuffer.wrap(token);
+            int value = counts.getOrDefault(tokenBuf, 0);
+            counts.put(tokenBuf, value + 1);
+           //counts.merge(tokenBuf, 1, Integer::sum);
         }
 
-        return counts;
-        /*return counts.entrySet().stream()
+        return counts.entrySet().stream()
                 .collect(Collectors.toMap(e -> {
                             try {
                                 return byteBufferToString(e.getKey());
@@ -63,16 +61,16 @@ public class WordCount{
                             }
                             return null;
                         },
-                        e -> e.getValue()));*/
+                        e -> e.getValue()));
     }
 
 
-    private static int THREAD_COUNT =16;
+    private static int THREAD_COUNT =8;
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
         System.out.println("Press any key...");
         System.in.read();
         long start = System.currentTimeMillis();
-        Collection<SplitReader> readers = generateSplitReaders("lorem_large.txt", THREAD_COUNT, 16 * 1024 * 1024);
+        Collection<SplitReader> readers = generateSplitReaders("lorem_medium.txt", THREAD_COUNT, 8 * 1024 * 1024);
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
 
         // Submit splits threads for execution
