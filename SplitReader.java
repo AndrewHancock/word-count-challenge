@@ -94,7 +94,7 @@ class SplitReader implements AutoCloseable{
     int tokenStart = -1;
     boolean consumedFirstToken = false;
     boolean eof = false;
-    public ByteBuffer getToken() throws IOException {
+    public byte[] getToken() throws IOException {
 
         // We always read one token PAST EndPos.
         // This ensures the subsequent split can safely skip the first token.
@@ -104,7 +104,7 @@ class SplitReader implements AutoCloseable{
 
         // If we are not the first split, and this is the first byte in the split, read and discard the first token.
         // This combined with the previous rule handles the case of tokens spanning splits.
-        if(startPos != 0 && !consumedFirstToken) {
+        if(!consumedFirstToken &&  startPos != 0) {
             consumedFirstToken = true;
             getToken();
         }
@@ -123,7 +123,12 @@ class SplitReader implements AutoCloseable{
 
         eof = eatBytes(false);
         tokenEnd = position;
-        return ByteBuffer.wrap(byteArray, tokenStart, tokenEnd - tokenStart);
+
+        int length = tokenEnd - tokenStart;
+        byte[] result = new byte[length];
+        System.arraycopy(byteArray, tokenStart, result, 0, length);
+
+        return result;
     }
 
     @Override

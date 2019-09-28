@@ -11,7 +11,7 @@ public class WordCountStreams {
         System.out.println("Press any key to continue...");
         System.in.read();
         long start = System.currentTimeMillis();
-        Map<String, Long> counts = Files.lines( Paths.get("lorem_medium.txt")).parallel()
+        Map<String, Long> counts = Files.lines( Paths.get("lorem_large.txt")).parallel()
                 .flatMap(x -> Arrays.stream(x.split(" ")))
                 .filter( w -> !w.isEmpty())
             .collect(Collectors.toMap(word -> word, word -> 1L, Long::sum));
