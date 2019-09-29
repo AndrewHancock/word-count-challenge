@@ -1,6 +1,5 @@
 import java.io.*;
 import java.lang.reflect.Array;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -41,14 +40,15 @@ public class WordCount{
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    private static Map<String, Integer> countWords(SplitReader tokenReader) throws IOException {
+    private static Map<String, Integer> countWords(BlockingQueue<byte[]> queue) throws IOException, InterruptedException {
         Map<ByteBuffer, Integer> counts = new HashMap<>(1024);
-        byte[] token = null;
-        while ((token = tokenReader.getToken()) != null) {
+        byte[] token;
+
+        while ((token = queue.take()).length != 0) {
             ByteBuffer tokenBuf = ByteBuffer.wrap(token);
             int value = counts.getOrDefault(tokenBuf, 0);
             counts.put(tokenBuf, value + 1);
-           //counts.merge(tokenBuf, 1, Integer::sum);
+            //counts.merge(tokenBuf, 1, Integer::sum);
         }
 
         return counts.entrySet().stream()
@@ -65,23 +65,39 @@ public class WordCount{
     }
 
 
-    private static int THREAD_COUNT =8;
+    private static int READER_THREADS =1;
+    private static int COUNT_THREADS = 14;
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
         System.out.println("Press any key...");
         System.in.read();
         long start = System.currentTimeMillis();
-        Collection<SplitReader> readers = generateSplitReaders("lorem_medium.txt", THREAD_COUNT, 8 * 1024 * 1024);
-        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        Collection<SplitReader> readers = generateSplitReaders("lorem_large.txt", READER_THREADS, 8 * 1024 * 1024);
+        ExecutorService executor = Executors.newFixedThreadPool(READER_THREADS);
 
+        BlockingQueue<byte[]> queue = new ArrayBlockingQueue<byte[]>(10000);
         // Submit splits threads for execution
         Collection<Future<Map<String, Integer>>> subCountFutures = new ArrayList<>();
-        for(SplitReader reader : readers) {
+        for(int i = 0; i < COUNT_THREADS; i++) {
             subCountFutures.add(executor.submit(() ->  {
-                Map<String, Integer> totals = countWords(reader);
-                reader.close();
+                Map<String, Integer> totals = countWords(queue);
                 return totals;
             }));
         }
+
+        for(SplitReader reader : readers) {
+            byte[] token;
+            try {
+                while ((token = reader.getToken()) != null) {
+                    queue.put(token);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        for (int i = 0; i < COUNT_THREADS; i++)
+            queue.add(new byte[0]);
+
 
         // Block on task completion and accumulate results
         Map<String, Integer> totalCounts = new HashMap<>();
