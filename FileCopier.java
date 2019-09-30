@@ -6,14 +6,14 @@ public class FileCopier {
 
     public static void main(String[] args) throws IOException {
         long start = System.currentTimeMillis();
-        try (FileOutputStream output = new FileOutputStream("lorem_large.txt")) {
+        try (FileOutputStream output = new FileOutputStream("lorem_medium.txt")) {
             try (FileInputStream input = new FileInputStream("lorem.txt")) {
                 byte[] buffer = new byte[(int)(new File(INPUT_FILENAME).length())];
                 int bytesRead = 0;
                 while (bytesRead != -1) {
                     bytesRead = input.read(buffer, bytesRead, buffer.length - bytesRead);
                 }
-                for (int i = 0; i < 30000; i++) {
+                for (int i = 0; i < 5000; i++) {
                     output.write(buffer);
                 }
             }

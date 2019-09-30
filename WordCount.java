@@ -1,12 +1,11 @@
 import java.io.*;
-import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-public class WordCount{
+public class WordCount {
 
 
     private static Collection<SplitReader> generateSplitReaders(String fileName, int numberOfSplits, int bufferSize) throws IOException {
@@ -15,15 +14,15 @@ public class WordCount{
         long splitSize = file.length() / numberOfSplits;
 
         long lastPos = 0;
-        for(int i = 0; i < numberOfSplits; i++) {
+        for (int i = 0; i < numberOfSplits; i++) {
             long startPos = 0;
-            if(lastPos != 0) {
+            if (lastPos != 0) {
                 startPos = lastPos + 1;
             }
             long endPos = startPos + splitSize;
 
             // To handle any remainder bytes, the last split is set to the end of the file
-            if(i == numberOfSplits - 1)
+            if (i == numberOfSplits - 1)
                 endPos = file.length();
 
             result.add(new SplitReader(fileName, startPos, endPos, bufferSize));
@@ -40,15 +39,12 @@ public class WordCount{
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    private static Map<String, Integer> countWords(BlockingQueue<byte[]> queue) throws IOException, InterruptedException {
+    private static Map<String, Integer> countWords(SplitReader reader) throws IOException, InterruptedException {
         Map<ByteBuffer, Integer> counts = new HashMap<>(1024);
         byte[] token;
-
-        while ((token = queue.take()).length != 0) {
+        while ((token = reader.getToken()) != null) {
             ByteBuffer tokenBuf = ByteBuffer.wrap(token);
-            int value = counts.getOrDefault(tokenBuf, 0);
-            counts.put(tokenBuf, value + 1);
-            //counts.merge(tokenBuf, 1, Integer::sum);
+            counts.merge(tokenBuf, 1, Integer::sum);
         }
 
         return counts.entrySet().stream()
@@ -64,67 +60,31 @@ public class WordCount{
                         e -> e.getValue()));
     }
 
+    private static int THREAD_COUNT = 16;
 
-    private static int READER_THREADS =1;
-    private static int COUNT_THREADS = 14;
-    public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
-        System.out.println("Press any key...");
-        System.in.read();
-        long start = System.currentTimeMillis();
-        Collection<SplitReader> readers = generateSplitReaders("lorem_large.txt", READER_THREADS, 8 * 1024 * 1024);
-        ExecutorService executor = Executors.newFixedThreadPool(READER_THREADS);
+    public static Map<String, Integer> run(String fileName) {
+        try {
+            Collection<SplitReader> readers = generateSplitReaders(fileName, THREAD_COUNT, 8 * 1024 * 1024);
+            ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
 
-        BlockingQueue<byte[]> queue = new ArrayBlockingQueue<byte[]>(10000);
-        // Submit splits threads for execution
-        Collection<Future<Map<String, Integer>>> subCountFutures = new ArrayList<>();
-        for(int i = 0; i < COUNT_THREADS; i++) {
-            subCountFutures.add(executor.submit(() ->  {
-                Map<String, Integer> totals = countWords(queue);
-                return totals;
-            }));
-        }
+            Collection<Future<Map<String, Integer>>> subCountFutures = new ArrayList<>();
 
-        for(SplitReader reader : readers) {
-            byte[] token;
-            try {
-                while ((token = reader.getToken()) != null) {
-                    queue.put(token);
+            for (SplitReader reader : readers) {
+                subCountFutures.add(executor.submit(() -> countWords(reader)));
+            }
+
+            // Block on task completion and accumulate results
+            Map<String, Integer> totalCounts = new HashMap<>();
+            for (Future<Map<String, Integer>> subCounts : subCountFutures) {
+                for (Map.Entry<String, Integer> entry : subCounts.get().entrySet()) {
+                    int count = totalCounts.getOrDefault(entry.getKey(), 0);
+                    totalCounts.put(entry.getKey(), (count + (Integer) entry.getValue()));
                 }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
             }
+            executor.shutdown();
+            return totalCounts;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-
-        for (int i = 0; i < COUNT_THREADS; i++)
-            queue.add(new byte[0]);
-
-
-        // Block on task completion and accumulate results
-        Map<String, Integer> totalCounts = new HashMap<>();
-        for(Future<Map<String, Integer>> subCounts : subCountFutures) {
-            for (Map.Entry<String, Integer> entry : subCounts.get().entrySet()) {
-                int count = totalCounts.getOrDefault(entry.getKey(), 0);
-                totalCounts.put(entry.getKey(), (count + (Integer)entry.getValue()));
-            }
-        }
-        executor.shutdown();
-        long end = System.currentTimeMillis();
-
-        totalCounts.entrySet().stream()
-                .sorted(Comparator.comparing(Map.Entry::getKey))
-                .map( x-> {
-                    System.out.printf("%s ==> %d\n", x.getKey(), x.getValue());
-                    return x;
-                })
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        System.out.println("Seconds: " + ((double)(end - start) / 1000));
-
-
-        for(Map.Entry<String, Integer> entry : totalCounts.entrySet()) {
-
-        }
-
-
     }
 }
