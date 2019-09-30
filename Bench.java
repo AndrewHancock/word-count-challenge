@@ -19,14 +19,16 @@ public class Bench {
         }
     }
 
+    private static int THREAD_COUNT = 16;
+    private static int BUFFER_SIZE = 4 * 1024 * 1024;
     public static void main(String[] args) {
 
         Collection<BenchmarkRun> benchmarks = new ArrayList<>(Arrays.asList (
                 new BenchmarkRun("Producer-Consumer pipeline using byte arrays and byte buffers",
-                        (fileName) -> PipelinedByteArrayWordCount.run(fileName, 15, 16 * 1024 * 1024)),
+                        (fileName) -> PipelinedByteArrayWordCount.run(fileName, THREAD_COUNT -1, BUFFER_SIZE)),
                 new BenchmarkRun("Parallel Java Streams", (fileName) -> WordCountStreams.run(fileName)),
                 new BenchmarkRun("Parallel reader threads using byte arrays and byte buffers",
-                        (fileName) -> WordCount.run(fileName))
+                        (fileName) -> MultipleReaderCounterWordCount.run(fileName, THREAD_COUNT, BUFFER_SIZE))
                 )
 
         );
@@ -35,7 +37,7 @@ public class Bench {
             System.out.println(run.name + ":");
             for(int i = 0; i < 10; i++) {
                 long start = System.currentTimeMillis();
-                run.benchFunc.apply("lorem_medium.txt");
+                run.benchFunc.apply("lorem_large.txt");
                 long end = System.currentTimeMillis();
                 System.out.println("Run #" + (i + 1) + ":" + (double)(end-start)/1000 );
             }

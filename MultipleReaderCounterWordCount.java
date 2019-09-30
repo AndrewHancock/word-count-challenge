@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-public class WordCount {
+public class MultipleReaderCounterWordCount {
 
 
     private static Collection<SplitReader> generateSplitReaders(String fileName, int numberOfSplits, int bufferSize) throws IOException {
@@ -60,12 +60,10 @@ public class WordCount {
                         e -> e.getValue()));
     }
 
-    private static int THREAD_COUNT = 16;
-
-    public static Map<String, Integer> run(String fileName) {
+    public static Map<String, Integer> run(String fileName, int threadCount, int buffer) {
         try {
-            Collection<SplitReader> readers = generateSplitReaders(fileName, THREAD_COUNT, 8 * 1024 * 1024);
-            ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+            Collection<SplitReader> readers = generateSplitReaders(fileName, threadCount, buffer);
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
             Collection<Future<Map<String, Integer>>> subCountFutures = new ArrayList<>();
 

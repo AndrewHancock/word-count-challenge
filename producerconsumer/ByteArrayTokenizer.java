@@ -43,7 +43,7 @@ public class ByteArrayTokenizer {
             }
         }
         else {
-            tokenLength = tokenEnd - tokenStart;
+            tokenLength = tokenEnd - tokenStart + 1;
         }
 
         byte[] tokenArray = new byte[tokenLength];
